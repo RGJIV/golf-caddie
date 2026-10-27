@@ -223,6 +223,21 @@
     return parts.join(", ");
   };
 
+  /* Ball flight shape: PGA Tour TrackMan peak heights (yd) and the landing angles from the player's elevation table.
+     Two parabolas meet at the peak: a long climb, then a descent sized so the ball comes down at the club's landing
+     angle. Short (partial) shots peak lower in proportion. Returns height above the straight line from start to landing. */
+  const FLIGHT = { "58 deg": [27, 56], "54 deg": [28, 55], "48 deg": [29, 53], PW: [29, 52], "9i": [30, 51], "8i": [31, 50],
+    "7i": [32, 50], "6i": [30, 49], "5i": [31, 47], "4i": [28, 46], "5 hybrid": [29, 45], "3 wood": [30, 43], Driver: [32, 38.5] };
+  function flightShape(club, distFt, fullCarryYd) {
+    const [apexYd, landDeg] = FLIGHT[club] || [30, 48];
+    const A = apexYd * 3 * Math.min(1.1, Math.max(0.45, distFt / 3 / (fullCarryYd || distFt / 3)));
+    let xa = distFt - (2 * A) / Math.tan((landDeg * Math.PI) / 180);
+    xa = Math.min(0.75 * distFt, Math.max(0.5 * distFt, xa));
+    return (s) => (s <= xa ? A - A * ((s - xa) / xa) ** 2 : A - A * ((s - xa) / (distFt - xa)) ** 2);
+  }
+
+  Engine.flightShape = flightShape;
+  Engine.FLIGHT = FLIGHT;
   Engine.playsLike = playsLike;
   Engine.strokes = strokes;
   Engine.bearingOf = bearingOf;

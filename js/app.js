@@ -33,7 +33,7 @@
   }
 
   // ---- course ----
-  const { C, grids, toLocal } = await GCGeo.loadCourse("data");
+  const { C, grids, toLocal, toLatLon } = await GCGeo.loadCourse("data");
   const E = new GCEngine(grids);
   const holes = C.holes;
   $("loading").hidden = true;
@@ -187,7 +187,15 @@
     const h = holes[holeN - 1], p = fix && !offCourse() ? fix.p : null;
     if (!p) { $("ballSheet").hidden = true; alertBar("No GPS fix on the course, so the shot was not saved."); return; }
     const list = shots();
-    list.push({ t: Date.now(), hole: h.n, x: r(p[0]), z: r(p[1]), acc: r(fix.acc), club, lie: last && last.onTee ? "tee" : lie, tee: S.teeSet });
+    // what the app said at the time, so plan and result can be compared later
+    const cond = conditions(), b = last && last.plan.best;
+    const latlon = toLatLon(p[0], p[1]);
+    list.push({ t: Date.now(), hole: h.n, x: r(p[0]), z: r(p[1]), acc: r(fix.acc), club, lie: last && last.onTee ? "tee" : lie, tee: S.teeSet,
+      lat: latlon ? +latlon[0].toFixed(6) : null, lon: latlon ? +latlon[1].toFixed(6) : null,
+      rec: b ? b.club : null, recNext: last && last.plan.next ? last.plan.next.club : null,
+      toPin: last ? r(last.plan.dist) : null, plays: last ? r(last.plan.plays) : null, pin: pinSpot,
+      tempF: cond.tempF != null ? r(cond.tempF) : null, windMph: cond.wind && cond.wind.mph != null ? r(cond.wind.mph) : null,
+      windFrom: cond.wind && cond.wind.mph ? r(cond.wind.fromDeg) : null });
     store.set("shots", list);
     $("ballSheet").hidden = true;
     alertBar(`Saved: ${club} from here (shot ${list.filter((s) => s.hole === h.n && Date.now() - s.t < 3 * 3600e3).length} on ${h.n}).`);
@@ -213,7 +221,7 @@
     $("windIn").value = S.wind == null ? "" : S.wind.mph;
     $("windDir").value = S.wind == null ? "" : compass(S.wind.fromDeg);
     fillClubRows(S.clubs);
-    $("learned").innerHTML = learnedTable();
+    $("learned").innerHTML = learnedTable(); sendInfo();
   }
   function readSettings() {
     S.teeSet = $("teeSet").value; S.competition = $("comp").checked;
@@ -252,6 +260,41 @@
     const b = e.target.closest("[data-use]"); if (!b) return;
     const inp = document.querySelector(`[data-carry="${b.dataset.use}"]`); if (inp) inp.value = b.dataset.med;
   });
+  // ---- send the shot log to Claude: an email to claude@cowrock.com that the hub turns into a task ----
+  const unsent = () => { const t = store.get("sentUpTo", 0); return shots().filter((s) => s.t > t); };
+  function sendInfo() {
+    const all = shots().length, n = unsent().length;
+    $("sendInfo").textContent = all ? `${all} shot${all === 1 ? "" : "s"} logged on this phone · ${n} not sent yet.` : "No shots logged yet. Tap Mark shot before each shot.";
+  }
+  function payload(list) {
+    const days = [...new Set(list.map((s) => new Date(s.t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })))];
+    const holesPlayed = [...new Set(list.map((s) => s.hole))].sort((a, b) => a - b);
+    return { app: "Caddie", course: C.name, sent: new Date().toISOString(), days, holes: holesPlayed, count: list.length,
+      clubs: S.clubs.map((c) => [c.club, c.carry, c.fairway]), shots: list };
+  }
+  $("sendClaude").onclick = () => {
+    const list = unsent().length ? unsent() : shots();
+    if (!list.length) { alertBar("No shots logged yet."); return; }
+    const p = payload(list);
+    const subject = `Hub: Golf - Caddie shot data, ${p.days.join(" and ")} (${p.count} shots)`;
+    const body = `Caddie shot data from ${C.name}: ${p.count} shots on holes ${p.holes.join(", ")}, ${p.days.join(" and ")}.\n` +
+      `Please save it in AI_Files 04_Personal/Golf and update the club numbers and analysis.\n\n` + JSON.stringify(p);
+    if (body.length > 60000) { alertBar("Too many shots for one email: use Share as a file instead."); return; }
+    location.href = `mailto:claude@cowrock.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    store.set("sentUpTo", Math.max(...list.map((s) => s.t)));
+    sendInfo();
+  };
+  $("shareFile").onclick = async () => {
+    const list = shots();
+    if (!list.length) { alertBar("No shots logged yet."); return; }
+    const p = payload(list), name = `caddie-shots-${new Date().toISOString().slice(0, 10)}.json`;
+    const file = new File([JSON.stringify(p, null, 1)], name, { type: "application/json" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Caddie shot data" }); return; }
+    } catch (e) { if (e.name === "AbortError") return; }
+    $("export").onclick();
+  };
+
   $("export").onclick = async () => {
     const txt = JSON.stringify({ shots: shots(), clubs: S.clubs });
     try { await navigator.clipboard.writeText(txt); alertBar("Round data copied. Paste it into a note or a message to Claude."); }

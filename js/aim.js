@@ -3,8 +3,6 @@
 (function (root) {
   "use strict";
   let renderer = null, tex = null, raf = 0;
-  const APEX = { "58 deg": 80, "54 deg": 85, "48 deg": 88, PW: 90, "9i": 92, "8i": 94, "7i": 96, "6i": 97, "5i": 98, "4i": 100,
-    "5 hybrid": 104, "3 wood": 108, Driver: 112 };
 
   function open(last, grids, C, E) {
     const wrap = document.getElementById("aim"), host = document.getElementById("aimView");
@@ -82,13 +80,13 @@
     };
     const canopy = new THREE.Mesh(cgeo, cm); canopy.renderOrder = 2; scene.add(canopy);
 
-    // flight: a simple arc that peaks a little past halfway, from your ball to the landing
+    // flight: tour-shaped ball flight for this club (engine.js flightShape), from your ball to the landing
     const zp = grids.ground(p[0], p[1]), zt = grids.ground(target[0], target[1]);
-    const apex = b ? APEX[b.club] || 95 : 90, arc = [];
+    const club = b ? E.byName[b.club] : null;
+    const lift = GCEngine.flightShape(b ? b.club : "7i", L, club ? club.carry : null), arc = [];
     for (let t = Math.min(0.08, 45 / L); t <= 1.0001; t += 0.02) {
-      const s = t < 0.55 ? t / 0.55 : (1 - t) / 0.45;
       const x = p[0] + (aimPt[0] - p[0]) * t + (target[0] - aimPt[0]) * t * t, z = p[1] + (aimPt[1] - p[1]) * t + (target[1] - aimPt[1]) * t * t;
-      arc.push(new THREE.Vector3(x, zp + (zt - zp) * t + apex * (1 - (1 - s) * (1 - s)) + 3, z));
+      arc.push(new THREE.Vector3(x, zp + (zt - zp) * t + lift(t * L) + 2, z));
     }
     scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arc), 80, 0.9, 6),
       new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.85 })));
