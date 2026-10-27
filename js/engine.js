@@ -225,6 +225,8 @@
       if (Math.abs(f.gap) > 12) continue;
       const tr = this.treeRisk(p, zp, q, zq, f.club), lr = this.landRisk(q, p, f.club);
       const g2 = this.go(q, zq, pin, zg, "fairway"); if (!g2) continue;
+      // never long, short, long: the layup is at least as long as the shot it leaves (two irons then a wedge is fine)
+      if (f.plays < g2.plays) continue;
       const fq = this.byName[f.club].fairway != null ? this.byName[f.club].fairway : 0.85;
       const v = 1 + HIT_COST * tr.hit + LAND_COST * lr + GAP_COST * Math.abs(f.gap) + g2.value + (1 - fq) * rough(g2.plays);
       const rank = v + (g2.rank - g2.value) + (tr.comfort ? COMFORT_COST : 0);
