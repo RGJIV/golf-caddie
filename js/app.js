@@ -129,7 +129,8 @@
       last = null; return;
     }
     $("call").hidden = false; $("compNote").hidden = true; $("setupNote").hidden = true;
-    E.setup({ clubs: S.clubs, tempF: cond.tempF, wind: cond.wind, teeClubs: ["Driver", "3 wood", "5 hybrid", "4i", "5i"].filter((c) => S.clubs.some((k) => k.club === c)),
+    E.setup({ clubs: S.clubs, tempF: cond.tempF, wind: cond.wind, comfortYd: comfortYd(), spread: learnedSpread(),
+      teeClubs: ["Driver", "3 wood", "5 hybrid", "4i", "5i"].filter((c) => S.clubs.some((k) => k.club === c)),
       layupClubs: ["3 wood", "5 hybrid", "4i", "5i", "6i", "7i", "8i", "9i", "PW"].filter((c) => S.clubs.some((k) => k.club === c)) });
     const plan = E.plan(p, h, pin, { onTee, lie });
     last = { plan, p, pin, h, onTee };
@@ -139,8 +140,10 @@
     $("club").textContent = b.club;
     if (b.kind === "approach") {
       $("target").textContent = `to the ${pinSpot === "M" ? "center" : pinSpot === "F" ? "front pin" : "back pin"} · ${r(b.dist)} yd, plays ${r(b.plays)}`;
+    } else if (b.kind === "layup") {
+      $("target").textContent = `lay up ${r(b.dist)} yd to open fairway`;
     } else {
-      $("target").textContent = b.layup ? `lands ${r(b.land.s)} yd out, then ${b.layup.club}` : `lands ${r(b.land.s)} yd out`;
+      $("target").textContent = `lands ${r(b.land.s)} yd out${b.aim ? ` · aim ${Math.abs(b.aim)} yd ${b.aim > 0 ? "right" : "left"}` : ""}`;
     }
     $("why").textContent = b.why.charAt(0).toUpperCase() + b.why.slice(1) + ".";
     $("next").innerHTML = n ? `<b>Or ${n.club}</b>: ${n.why}.` : "";
@@ -193,6 +196,8 @@
     list.push({ t: Date.now(), hole: h.n, x: r(p[0]), z: r(p[1]), acc: r(fix.acc), club, lie: last && last.onTee ? "tee" : lie, tee: S.teeSet,
       lat: latlon ? +latlon[0].toFixed(6) : null, lon: latlon ? +latlon[1].toFixed(6) : null,
       rec: b ? b.club : null, recNext: last && last.plan.next ? last.plan.next.club : null,
+      // where the call was aimed (local ft), so left/right misses can be measured per club
+      aimX: b ? r((b.kind === "full" ? b.land.p : b.target)[0]) : null, aimZ: b ? r((b.kind === "full" ? b.land.p : b.target)[1]) : null,
       toPin: last ? r(last.plan.dist) : null, plays: last ? r(last.plan.plays) : null, pin: pinSpot,
       tempF: cond.tempF != null ? r(cond.tempF) : null, windMph: cond.wind && cond.wind.mph != null ? r(cond.wind.mph) : null,
       windFrom: cond.wind && cond.wind.mph ? r(cond.wind.fromDeg) : null });
@@ -220,6 +225,8 @@
     $("tempIn").value = S.temp == null ? "" : S.temp;
     $("windIn").value = S.wind == null ? "" : S.wind.mph;
     $("windDir").value = S.wind == null ? "" : compass(S.wind.fromDeg);
+    $("comfortIn").value = S.comfortYd == null ? 10 : S.comfortYd;
+    $("summer").checked = S.summerPad !== false;
     fillClubRows(S.clubs);
     $("learned").innerHTML = learnedTable(); sendInfo();
   }
@@ -228,6 +235,8 @@
     S.temp = $("tempIn").value === "" ? null : +$("tempIn").value;
     const dirs = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
     S.wind = $("windIn").value === "" ? null : { mph: +$("windIn").value, fromDeg: dirs[($("windDir").value || "N").toUpperCase()] ?? 0 };
+    S.comfortYd = $("comfortIn").value === "" ? 10 : Math.max(0, +$("comfortIn").value);
+    S.summerPad = $("summer").checked;
     S.clubs = ORDER.map((c) => {
       const v = document.querySelector(`[data-carry="${c}"]`).value, f = document.querySelector(`[data-fw="${c}"]`).value;
       return v ? { club: c, carry: +v, factor: FACTORS[c], fairway: f ? +f / 100 : null } : null;
@@ -235,26 +244,48 @@
     store.set("settings", S);
   }
 
-  // what the logged shots say: distance per club (to the next ball position) and fairway rate off the tee
+  // tree comfort zone: Settings (default 10 yd), plus 2 yd May to October when the trees are in leaf
+  function comfortYd() {
+    const base = S.comfortYd == null ? 10 : S.comfortYd, m = new Date().getMonth();
+    return base + (S.summerPad !== false && m >= 4 && m <= 9 ? 2 : 0);
+  }
+  // left/right spread per club from the shot log: twice the standard deviation of the miss angle, once 8+ shots
+  function learnedSpread() {
+    const out = {}, L = learned();
+    for (const [c, o] of Object.entries(L)) if (o.ang.length >= 8) {
+      const m = o.ang.reduce((x, y) => x + y, 0) / o.ang.length;
+      const sd = Math.sqrt(o.ang.reduce((x, y) => x + (y - m) ** 2, 0) / (o.ang.length - 1));
+      out[c] = Math.min(15, Math.max(2, 2 * sd));
+    }
+    return out;
+  }
+  // what the logged shots say: distance per club (to the next ball position), fairway rate off the tee, miss angle
   function learned() {
     const L = shots(), out = {};
     for (let i = 0; i < L.length - 1; i++) {
       const a = L[i], b = L[i + 1];
       if (a.hole !== b.hole || b.t - a.t > 30 * 60e3 || a.acc > 40 || b.acc > 40) continue;
-      const d = Math.hypot(b.x - a.x, b.z - a.z) / 3, o = (out[a.club] = out[a.club] || { d: [], fw: 0, tee: 0 });
+      const d = Math.hypot(b.x - a.x, b.z - a.z) / 3, o = (out[a.club] = out[a.club] || { d: [], fw: 0, tee: 0, ang: [] });
       o.d.push(d);
       if (a.lie === "tee") { o.tee++; if (b.lie === "fairway") o.fw++; }
+      if (a.aimX != null && d > 40) {
+        const t1 = Math.atan2(a.aimX - a.x, -(a.aimZ - a.z)), t2 = Math.atan2(b.x - a.x, -(b.z - a.z));
+        let dAng = ((t2 - t1) * 180) / Math.PI; dAng = ((dAng + 540) % 360) - 180;
+        if (Math.abs(dAng) < 45) o.ang.push(dAng);
+      }
     }
     return out;
   }
   function learnedTable() {
     const L = learned(), ks = ORDER.filter((c) => L[c]);
     if (!ks.length) return "<p class='muted'>Tap Mark shot before each shot. After a few rounds this shows your real distance per club and how often each tee club finds the fairway.</p>";
-    return `<table><tr><th>Club</th><th>Shots</th><th>Median yd</th><th>Fairway off tee</th><th></th></tr>${ks.map((c) => {
+    const sp = learnedSpread();
+    return `<table><tr><th>Club</th><th>Shots</th><th>Median yd</th><th>Fairway off tee</th><th>Spread</th><th></th></tr>${ks.map((c) => {
       const d = L[c].d.slice().sort((a, b) => a - b), med = r(d[Math.floor(d.length / 2)]);
       return `<tr><td>${c}</td><td>${d.length}</td><td>${med}</td><td>${L[c].tee ? r((100 * L[c].fw) / L[c].tee) + "% of " + L[c].tee : ""}</td>
+        <td>${sp[c] ? "±" + sp[c].toFixed(1) + "°" : `±${GCEngine.SPREAD[c] || 4}° (default)`}</td>
         <td>${d.length >= 5 ? `<button data-use="${c}" data-med="${med}">Use</button>` : ""}</td></tr>`;
-    }).join("")}</table><p class="muted">Distances include roll. Use a number only once it has 5 or more shots.</p>`;
+    }).join("")}</table><p class="muted">Distances include roll. Use a number only once it has 5 or more shots. Spread (left/right) switches from the default to yours on its own after 8 shots with a call to aim at.</p>`;
   }
   $("learned").addEventListener("click", (e) => {
     const b = e.target.closest("[data-use]"); if (!b) return;

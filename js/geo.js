@@ -19,10 +19,12 @@
   async function loadCourse(dir) {
     const C = await (await fetch(`${dir}/course.json`)).json();
     const g = C.grid, cg = C.canopy;
-    const [hp, cp, wp] = await Promise.all([pixels(`${dir}/height.png`, g.nx, g.ny), pixels(`${dir}/canopy.png`, cg.nx, cg.ny),
-      pixels(`${dir}/water.png`, cg.nx, cg.ny)]);
+    const [hp, cp, wp, fp] = await Promise.all([pixels(`${dir}/height.png`, g.nx, g.ny), pixels(`${dir}/canopy.png`, cg.nx, cg.ny),
+      pixels(`${dir}/water.png`, cg.nx, cg.ny), C.fairway ? pixels(`${dir}/fairway.png`, cg.nx, cg.ny) : null]);
     const H = decode16(hp, g.nx * g.ny), CT = decode16(cp, cg.nx * cg.ny);
     const WT = new Uint8Array(cg.nx * cg.ny); for (let i = 0; i < WT.length; i++) WT[i] = wp[i * 4] > 127 ? 1 : 0;
+    const FW = fp ? new Uint8Array(cg.nx * cg.ny) : null;
+    if (FW) for (let i = 0; i < FW.length; i++) FW[i] = fp[i * 4] > 127 ? 1 : 0;
     const cell = (x, z) => { const i = Math.floor(x / cg.g), j = Math.floor(z / cg.g); return i < 0 || j < 0 || i >= cg.nx || j >= cg.ny ? -1 : j * cg.nx + i; };
     const grids = {
       ground(x, z) {
@@ -32,6 +34,7 @@
       },
       canopy(x, z) { const k = cell(x, z); return k < 0 ? 0 : CT[k]; },
       water(x, z) { const k = cell(x, z); return k >= 0 && WT[k] > 0; },
+      fairway(x, z) { if (!FW) return true; const k = cell(x, z); return k >= 0 && FW[k] > 0; },
       H, CT, g, cg,
     };
     const P = C.proj;

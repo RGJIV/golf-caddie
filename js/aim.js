@@ -9,7 +9,7 @@
     wrap.hidden = false;
     const { plan, p, pin, h } = last, b = plan.best;
     const g = grids.g;
-    const target = b ? (b.kind === "approach" ? pin : b.land.p) : pin;
+    const target = b ? (b.kind === "full" ? b.land.p : b.target) : pin;     // approach: the pin; layup: the open spot
     const drift = b && b.drift ? b.drift * 3 : 0;   // ft, + = aim right
     const dx = target[0] - p[0], dz = target[1] - p[1], L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
     // aim point: the target moved into the wind; right of the shot line (facing ux, uz with x east, z south) is (-uz, ux)
@@ -121,7 +121,8 @@
     el.onpointerup = () => (drag = null);
 
     const info = document.getElementById("aimInfo");
-    info.textContent = b ? `${b.club} · ${b.kind === "approach" ? "plays " + Math.round(b.plays) : "lands " + Math.round(b.land.s) + " yd out"}${Math.abs(drift) > 6 ? ` · aim ${Math.abs(Math.round(drift / 3))} yd ${drift > 0 ? "right" : "left"} (blue pole)` : ""}` : "No clear shot found";
+    const what = !b ? "" : b.kind === "approach" ? "plays " + Math.round(b.plays) : b.kind === "layup" ? "lay up " + Math.round(b.dist) + " yd to open fairway" : "lands " + Math.round(b.land.s) + " yd out";
+    info.textContent = b ? `${b.club} · ${what}${Math.abs(drift) > 6 ? ` · aim ${Math.abs(Math.round(drift / 3))} yd ${drift > 0 ? "right" : "left"} (blue pole)` : ""}` : "No clear shot found";
     cancelAnimationFrame(raf);
     const loop = () => { renderer.render(scene, cam); raf = requestAnimationFrame(loop); };
     loop();
