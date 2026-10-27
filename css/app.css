@@ -39,6 +39,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .call .club { font-family: var(--display); font-weight: 700; font-size: 72px; line-height: 0.95; color: var(--go); }
 .call .target { font-size: 20px; font-weight: 600; }
 .call .why { font-size: 17px; line-height: 1.35; }
+.call .changed { font-size: 16px; font-weight: 600; line-height: 1.35; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--go) 14%, transparent); }
+.group button.auto::after { content: " (map)"; font-size: 12px; opacity: 0.8; }
 .call .next { font-size: 16px; line-height: 1.35; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 6px; }
 .call .next b { color: var(--ink); }
 .note { background: #fff7d6; border: 1px solid #e8d48a; border-radius: 12px; padding: 12px 14px; font-size: 16px; }
@@ -52,7 +54,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 
 .chips { display: flex; flex-direction: column; gap: 8px; }
 .group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.group span { width: 34px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.group span { width: 46px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .group button { flex: 1; min-height: 44px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); font-size: 16px; cursor: pointer; }
 .group button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 .group button:disabled { opacity: 0.4; }

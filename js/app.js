@@ -42,6 +42,11 @@
   let fix = null;          // {p:[x,z], acc ft, t}
   let holeN = store.get("hole", 1), manualUntil = 0;
   let pinSpot = "M", lie = "fairway";
+  let lieManual = null;    // {lie, p}: a tapped lie, kept until you walk 10 yd away; otherwise the lie comes from the fairway map
+  let openLine = null;     // {p}: "I can see the green" for the shot from this spot (trees ignored), until you walk 10 yd away
+  let hold = null, still = null;   // hold {p}: the spot the call is held for; still {t, pts}: GPS fixes while standing
+  const recent = [];       // last 3 fixes, averaged to tell walking away from GPS wobble
+  let teeMemo = { key: null, plan: null };
   let last = null;         // last plan
   const offCourse = () => !fix || Math.min(...holes.map((h) => distToHole(fix.p, h))) > 900;
 
@@ -72,7 +77,7 @@
     holes.forEach((h) => { const d = distToHole(fix.p, h); if (d < bd - 60) { best = h; bd = d; } });
     if (best !== cur) setHole(best.n);
   }
-  function setHole(n) { holeN = ((n - 1 + 18) % 18) + 1; store.set("hole", holeN); pinSpot = "M"; render(); }
+  function setHole(n) { holeN = ((n - 1 + 18) % 18) + 1; store.set("hole", holeN); pinSpot = "M"; lieManual = null; openLine = null; render(); }
 
   // the green along your line to it: front edge, center and back edge (from the traced outline; 8 yd either side without one)
   function greenAxis(h, from) {
@@ -119,25 +124,32 @@
   function render() {
     const h = holes[holeN - 1], tee = teeFor(h);
     const preview = offCourse();
-    const p = preview ? tee.p : fix.p;
+    const p = preview ? tee.p : hold ? hold.p : fix.p;
     const onTee = preview || Object.values(h.tees).some((t) => hyp(p, t.p) < 45);
+    if (lieManual && hyp(p, lieManual.p) > 30) lieManual = null;
+    if (openLine && hyp(p, openLine.p) > 30) openLine = null;
+    lie = lieManual ? lieManual.lie : E.onFairway(p) >= 0.5 ? "fairway" : "rough";
     const pin = pinPoint(h, p);
     const cond = conditions();
     $("holeNum").textContent = h.n;
     $("holeMeta").textContent = `Par ${h.par} · ${h.yards[S.teeSet] || h.yards[tee.name]} yd · ${S.teeSet}${tee.name !== S.teeSet ? ` (plays ${tee.name})` : ""}`;
     $("gps").textContent = preview ? (fix ? "Off the course: preview from the tee" : "Waiting for GPS: preview from the tee")
-      : `GPS ±${r(fix.acc)} ft${fix.acc > 30 ? " (weak)" : ""}`;
+      : `GPS ±${r(fix.acc)} ft${fix.acc > 30 ? " (weak)" : ""}${hold ? " · call held for this spot" : ""}`;
     $("gps").className = "gps" + (preview || fix.acc > 30 ? " warn" : "");
     $("cond").textContent = `${r(cond.tempF)}°F · wind ${r(cond.wind.mph || 0)} mph ${cond.wind.mph ? "from " + compass(cond.wind.fromDeg) : ""}${S.temp != null || S.wind != null ? " (set)" : ""}`;
     document.querySelectorAll("[data-pin]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pin === pinSpot)));
-    document.querySelectorAll("[data-lie]").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.lie === lie)); b.disabled = onTee; });
+    document.querySelectorAll("[data-lie]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.lie === lie)); b.disabled = onTee;
+      b.classList.toggle("auto", !onTee && !lieManual && b.dataset.lie === lie);
+    });
+    $("btnOpen").setAttribute("aria-pressed", String(!!openLine));
 
     // front, center, back: straight yards
     const ax = greenAxis(h, p);
     $("front").textContent = r(hyp(p, ax.front) / 3); $("center").textContent = r(hyp(p, ax.g) / 3); $("back").textContent = r(hyp(p, ax.back) / 3);
 
     if (S.competition || !S.clubs.length) {
-      $("call").hidden = true; $("compNote").hidden = !S.competition; $("setupNote").hidden = !!S.clubs.length || S.competition;
+      $("changed").hidden = true; $("call").hidden = true; $("btnOpen").disabled = true; $("compNote").hidden = !S.competition; $("setupNote").hidden = !!S.clubs.length || S.competition;
       $("plays").textContent = "";
       last = null; return;
     }
@@ -145,7 +157,12 @@
     E.setup({ clubs: S.clubs, tempF: cond.tempF, wind: cond.wind, comfortYd: comfortYd(), spread: learnedSpread(),
       teeClubs: ["Driver", "3 wood", "5 hybrid", "4i", "5i"].filter((c) => S.clubs.some((k) => k.club === c)),
       layupClubs: ["3 wood", "5 hybrid", "4i", "5i", "6i", "7i", "8i", "9i", "PW"].filter((c) => S.clubs.some((k) => k.club === c)) });
-    const plan = E.plan(p, h, pin, { onTee, lie });
+    const tp = onTee ? null : teePlan(h, cond);
+    const plan = E.plan(p, h, pin, { onTee, lie, openLine: !!openLine });
+    const ch = tp ? changeNote(plan, tp, p, pin) : "";
+    $("changed").hidden = !ch; $("changed").textContent = ch;
+    $("btnOpen").disabled = plan.mode !== "approach" || (onTee && h.par > 3);
+    if ($("btnOpen").disabled && openLine) { openLine = null; $("btnOpen").setAttribute("aria-pressed", "false"); }
     last = { plan, p, pin, h, onTee };
     $("plays").textContent = `plays ${r(plan.plays)}`;
     const b = plan.best, n = plan.next;
@@ -166,7 +183,47 @@
   function onFix(pos) {
     const c = pos.coords;
     fix = { p: toLocal(c.latitude, c.longitude), acc: c.accuracy * 3.28084, t: pos.timestamp };
-    autoHole(); render();
+    recent.push(fix.p); if (recent.length > 3) recent.shift();
+    track(); autoHole(); render();
+  }
+  // hold the call: after 5 seconds standing still (or a Mark shot) the spot is kept, so GPS wobble cannot flip the call
+  // over the ball; it lets go once you walk 10 yd away (average of the last 3 fixes, so one jumpy fix does not count)
+  function track() {
+    if (!fix || offCourse()) { hold = still = null; return; }
+    const now = Date.now(), m = [recent.reduce((a, q) => a + q[0], 0) / recent.length, recent.reduce((a, q) => a + q[1], 0) / recent.length];
+    if (hold && hyp(m, hold.p) > 30) hold = null;
+    if (!still || hyp(fix.p, still.pts[0]) > 20) still = { t: now, pts: [fix.p] };
+    else if (still.pts[still.pts.length - 1] !== fix.p) still.pts.push(fix.p);
+    if (!hold && now - still.t >= 5000) {
+      const n = still.pts.length;
+      hold = { p: [still.pts.reduce((a, q) => a + q[0], 0) / n, still.pts.reduce((a, q) => a + q[1], 0) / n] };
+    }
+  }
+  // the phone sends fewer fixes when you stand still, so check once a second too
+  setInterval(() => { const h0 = hold; track(); if (hold !== h0) render(); }, 1000);
+
+  // the tee plan for this hole (same clubs, weather and pin), to say when the call from the ball differs from it
+  function teePlan(h, cond) {
+    const tee = teeFor(h), key = JSON.stringify([h.n, tee.name, pinSpot, S.clubs, cond, comfortYd()]);
+    if (teeMemo.key !== key) teeMemo = { key, plan: E.plan(tee.p, h, pinPoint(h, tee.p), { onTee: h.par > 3, lie: "fairway" }) };
+    return teeMemo.plan;
+  }
+  const treeTrouble = (tr) => !!tr && (tr.comfort || tr.hit >= 0.1);
+  function changeNote(plan, tp, p, pin) {
+    const b = plan.best, t = tp.best;
+    if (!b || !t || t.kind !== "full" || !t.next) return "";
+    let want = t.next;                                   // the tee plan's next shot: go at the green, or a layup
+    if (want.kind === "layup" && hyp(p, pin) < hyp(want.target, pin) + 60) want = want.leave;   // already past the layup spot
+    if (want.kind === "layup" && b.kind === "approach")
+      return `Changed from the tee plan: go at the green. The tee plan laid up with ${want.club}; ${b.tree && b.tree.open ? "you can see the green" : treeTrouble(b.tree) ? "going is the better bet from here" : "the trees are clear from here"}.`;
+    if (want.kind === "approach" && b.kind === "layup") {
+      const a = plan.all.find((c) => c.kind === "approach");
+      return `Changed from the tee plan: lay up instead of going at the green${a && treeTrouble(a.tree) ? ", trees are in the way from here" : ""}.`;
+    }
+    if (want.kind === "approach" && b.kind === "approach" && want.club !== b.club)
+      return `The tee plan left ${r(want.plays)} (${want.club}); from here it plays ${r(b.plays)}, so ${b.club}.`;
+    if (want.club !== b.club) return `Changed from the tee plan: ${b.club} from here (the tee plan had ${want.club} next).`;
+    return "";
   }
   if ("geolocation" in navigator) {
     navigator.geolocation.watchPosition(onFix, (e) => { $("gps").textContent = e.code === 1 ? "Location is off for this app: turn on Precise Location" : "No GPS fix yet"; },
@@ -183,7 +240,9 @@
   $("prev").onclick = () => { manualUntil = Date.now() + 120000; setHole(holeN - 1); };
   $("nextHole").onclick = () => { manualUntil = Date.now() + 120000; setHole(holeN + 1); };
   document.querySelectorAll("[data-pin]").forEach((b) => (b.onclick = () => { pinSpot = b.dataset.pin; render(); }));
-  document.querySelectorAll("[data-lie]").forEach((b) => (b.onclick = () => { lie = b.dataset.lie; render(); }));
+  const herePt = () => (last ? last.p : fix ? fix.p : null);
+  document.querySelectorAll("[data-lie]").forEach((b) => (b.onclick = () => { const q = herePt(); if (q) lieManual = { lie: b.dataset.lie, p: q }; render(); }));
+  $("btnOpen").onclick = () => { const q = herePt(); openLine = openLine || !q ? null : { p: q }; render(); };
   $("btnAim").onclick = () => { if (last) GCAim.open(last, grids, C, E); };
 
   // ---- ball here: log the shot ----
@@ -200,7 +259,7 @@
   };
   $("ballCancel").onclick = () => ($("ballSheet").hidden = true);
   function saveShot(club) {
-    const h = holes[holeN - 1], p = fix && !offCourse() ? fix.p : null;
+    const h = holes[holeN - 1], p = fix && !offCourse() ? (hold ? hold.p : fix.p) : null;
     if (!p) { $("ballSheet").hidden = true; alertBar("No GPS fix on the course, so the shot was not saved."); return; }
     const list = shots();
     // what the app said at the time, so plan and result can be compared later
@@ -213,7 +272,9 @@
       aimX: b ? r((b.kind === "full" ? b.land.p : b.target)[0]) : null, aimZ: b ? r((b.kind === "full" ? b.land.p : b.target)[1]) : null,
       toPin: last ? r(last.plan.dist) : null, plays: last ? r(last.plan.plays) : null, pin: pinSpot,
       tempF: cond.tempF != null ? r(cond.tempF) : null, windMph: cond.wind && cond.wind.mph != null ? r(cond.wind.mph) : null,
-      windFrom: cond.wind && cond.wind.mph ? r(cond.wind.fromDeg) : null });
+      windFrom: cond.wind && cond.wind.mph ? r(cond.wind.fromDeg) : null,
+      lieFromMap: !(last && last.onTee) && !lieManual, openLine: !!openLine, held: !!hold });
+    hold = { p }; render();                              // keep the call for this spot while you hit
     store.set("shots", list);
     $("ballSheet").hidden = true;
     alertBar(`Saved: ${club} from here (shot ${list.filter((s) => s.hole === h.n && Date.now() - s.t < 3 * 3600e3).length} on ${h.n}).`);

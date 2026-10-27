@@ -1,5 +1,5 @@
 /* Offline: keep the whole app and course on the phone. Bump VERSION when any file changes. */
-const VERSION = "caddie-2026-10-27j";
+const VERSION = "caddie-2026-10-27k";
 const FILES = ["./", "index.html", "css/app.css", "js/geo.js", "js/engine.js", "js/aim.js", "js/app.js", "vendor/three.min.js",
   "manifest.webmanifest", "icons/icon-180.png", "icons/icon-512.png",
   "data/course.json", "data/height.png", "data/canopy.png", "data/water.png", "data/fairway.png", "data/aerial.jpg"];

@@ -28,6 +28,7 @@
     <div class="label">Hit</div>
     <div class="club" id="club">—</div>
     <div class="target" id="target"></div>
+    <div class="changed" id="changed" hidden></div>
     <div class="why" id="why"></div>
     <div class="next" id="next"></div>
   </section>
@@ -45,6 +46,8 @@
       <button data-pin="F">Front</button><button data-pin="M">Middle</button><button data-pin="B">Back</button></div>
     <div class="group" role="group" aria-label="Lie"><span>Lie</span>
       <button data-lie="fairway">Fairway</button><button data-lie="rough">Rough</button><button data-lie="bunker">Bunker</button></div>
+    <div class="group" role="group" aria-label="Trees"><span>Trees</span>
+      <button id="btnOpen" aria-pressed="false">I can see the green</button></div>
   </section>
 
   <section class="actions">

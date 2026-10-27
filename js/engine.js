@@ -93,6 +93,8 @@
   // ---- trees ----
   Engine.prototype.treeRisk = function (a, za, b, zb, clubName) {
     const D = hyp(a, b);
+    // "I can see the green": the player's eyes beat the scan for the shot from where they stand
+    if (this._open && a[0] === this._open[0] && a[1] === this._open[1]) return { hit: 0, comfort: false, open: true };
     if (D < 90) return { hit: 0, comfort: false };
     const c = this.byName[clubName], lift = flightShape(clubName, D, c ? c.carry : null);
     const ux = (b[0] - a[0]) / D, uz = (b[1] - a[1]) / D, nx = -uz, nz = ux;     // n: RIGHT of the shot (x east, z south)
@@ -238,6 +240,7 @@
 
   /* The call from where you stand. Returns {mode, best, next, all, dist, plays, pin} with short reasons. */
   Engine.prototype.plan = function (p, hole, pin, opts) {
+    this._open = null;
     const lie = opts.onTee ? "fairway" : opts.lie || "fairway";
     const zp = this.g.ground(p[0], p[1]), zg = this.g.ground(pin[0], pin[1]);
     const direct = this.approachFit(p, zp, pin, zg, lie)[0];
@@ -247,6 +250,7 @@
 
     if (reachable && !(teeShot && direct.plays > 230)) {
       // approach: the clubs that fit, or a layup to open fairway when the trees make going at it a bad bet
+      this._open = opts.openLine ? p : null;          // "I can see the green" counts only when the green is in reach
       const fits = this.approachFit(p, zp, pin, zg, lie).slice(0, 3).filter((f) => Math.abs(f.gap) <= 25);
       const cands = fits.map((f) => {
         const tr = this.treeRisk(p, zp, pin, zg, f.club);
@@ -320,6 +324,7 @@
       if (best && o !== best) parts.push(`${(o.value - best.value).toFixed(2)} strokes behind`);
     }
     const tw = treeWords(o.tree); if (tw) parts.push(tw);
+    if (o.tree && o.tree.open) parts.push("trees ignored on this shot (you can see the green)");
     return parts.join(", ");
   };
 
