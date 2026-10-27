@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Caddie">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f6f7f2">
+<title>Caddie</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="loading" id="loading">Loading the course…</div>
+
+<main class="app">
+  <header class="top">
+    <button class="nav" id="prev" aria-label="Previous hole">‹</button>
+    <div class="hole"><span class="num" id="holeNum">1</span><span class="meta" id="holeMeta"></span></div>
+    <button class="nav" id="nextHole" aria-label="Next hole">›</button>
+  </header>
+  <div class="gps" id="gps">Waiting for GPS</div>
+
+  <section class="call" id="call" aria-live="polite">
+    <div class="label">Hit</div>
+    <div class="club" id="club">—</div>
+    <div class="target" id="target"></div>
+    <div class="why" id="why"></div>
+    <div class="next" id="next"></div>
+  </section>
+  <section class="note" id="compNote" hidden>Competition mode: distances only. Turn it off in Settings for plays-like and club calls.</section>
+  <section class="note" id="setupNote" hidden>Add your club distances in Settings (or open your setup link) to get club calls. Distances work now.</section>
+
+  <section class="yards" aria-label="Distance to the green">
+    <div><span class="k">Front</span><span class="v" id="front">–</span></div>
+    <div class="mid"><span class="k">Center</span><span class="v" id="center">–</span><span class="p" id="plays"></span></div>
+    <div><span class="k">Back</span><span class="v" id="back">–</span></div>
+  </section>
+
+  <section class="chips">
+    <div class="group" role="group" aria-label="Pin"><span>Pin</span>
+      <button data-pin="F">Front</button><button data-pin="M">Middle</button><button data-pin="B">Back</button></div>
+    <div class="group" role="group" aria-label="Lie"><span>Lie</span>
+      <button data-lie="fairway">Fairway</button><button data-lie="rough">Rough</button><button data-lie="bunker">Bunker</button></div>
+  </section>
+
+  <section class="actions">
+    <button class="primary" id="btnBall">Ball here</button>
+    <button id="btnAim">Aim view</button>
+    <button id="btnSet">Settings</button>
+  </section>
+  <div class="cond" id="cond"></div>
+  <footer class="foot">© 2026 Cow Rock Construction, LLC. All rights reserved. Proprietary and confidential. No copying, reproduction, redistribution, AI/ML training or data mining without written permission.</footer>
+</main>
+
+<div class="sheet" id="ballSheet" hidden>
+  <div class="panel">
+    <h2>Which club from here?</h2>
+    <p class="muted">Saves this spot and club. The next Ball here measures how far it went.</p>
+    <div class="clubList" id="clubList"></div>
+    <button id="ballCancel">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet" id="settings" hidden>
+  <div class="panel">
+    <h2>Settings</h2>
+    <label>Tees <select id="teeSet"></select></label>
+    <label class="row"><input type="checkbox" id="comp"> Competition mode (distances only)</label>
+    <div class="two">
+      <label>Temperature °F <input id="tempIn" inputmode="numeric" placeholder="auto"></label>
+      <label>Wind mph <input id="windIn" inputmode="numeric" placeholder="auto"></label>
+      <label>Wind from <input id="windDir" placeholder="N, SW…"></label>
+    </div>
+    <p class="muted">Leave temperature and wind blank to use the latest forecast reading (updated whenever there is signal).</p>
+    <h3>Your clubs</h3>
+    <p class="muted">Carry in yards at about 75°F; fairway % for tee clubs. Stored on this phone only.</p>
+    <table class="clubs"><tr><th>Club</th><th>Carry</th><th>Fairway %</th></tr><tbody id="clubRows"></tbody></table>
+    <h3>Learned from your shots</h3>
+    <div id="learned"></div>
+    <div class="actions">
+      <button id="export">Copy round data</button>
+      <button id="clearShots">Clear logged shots</button>
+    </div>
+    <textarea id="exportBox" hidden rows="4" aria-label="Round data"></textarea>
+    <button class="primary" id="setClose">Save</button>
+  </div>
+</div>
+
+<div class="aim" id="aim" hidden>
+  <div class="aimView" id="aimView"></div>
+  <div class="aimBar"><span id="aimInfo"></span><button id="aimClose">Close</button></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/aim.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
