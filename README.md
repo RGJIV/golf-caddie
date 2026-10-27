@@ -10,12 +10,13 @@ club with a one-line reason and the next-best option, recalculated from GPS for 
   temperature, wind and lie; a tree and hill check along the ball flight against the lidar canopy; water; full shots and
   layups ranked by expected strokes (tour baseline, fairway rates, in-between penalty).
 - **Aim view** (`js/aim.js`): the hole in 3D from your spot with the planned flight, aim point (wind) and landing.
-- **Shot log**: Ball here before each shot; Settings shows real distance per club and fairway rate off the tee, and can
+- **Shot log**: Mark shot before each shot; Settings shows real distance per club and fairway rate off the tee, and can
   use them as your numbers.
 - **Competition mode**: distances only.
-- **Data** (`data/`): course geometry only, built by `cowrock-tools/golf-map/pack_phone.py` from the golf-map pipeline.
-  No player data is in this repo: club numbers live on the phone (Settings, or a setup link `#setup=<base64>` that is
-  read once and removed from the address bar).
+- **Data** (`data/`): course geometry, built by `cowrock-tools/golf-map/pack_phone.py` from the golf-map pipeline.
+- **Club numbers**: built in (`DEFAULT_CLUBS` in `js/app.js`, Richard's carries and fairway rates) and editable in
+  Settings, where the phone keeps any changes. A setup link `#setup=<base64>` still works but is no longer needed
+  (a Home Screen app keeps its own storage, separate from Safari, so a link opened in Safari does not reach it).
 
 Hosted on GitHub Pages. After changing any file, bump `VERSION` in `sw.js` so phones pick up the new copy.
 Weather: Open-Meteo (no key), only when there is signal; otherwise the last reading or what you type in Settings.

@@ -119,7 +119,7 @@
     let drag = null;
     const el = renderer.domElement;
     el.onpointerdown = (e) => { drag = [e.clientX, e.clientY, yaw, pitch]; el.setPointerCapture(e.pointerId); };
-    el.onpointermove = (e) => { if (!drag) return; yaw = drag[2] - (e.clientX - drag[0]) * 0.005; pitch = Math.max(-0.6, Math.min(0.5, drag[3] + (e.clientY - drag[1]) * 0.004)); look(); };
+    el.onpointermove = (e) => { if (!drag) return; yaw = drag[2] + (e.clientX - drag[0]) * 0.005; pitch = Math.max(-0.6, Math.min(0.5, drag[3] + (e.clientY - drag[1]) * 0.004)); look(); };
     el.onpointerup = () => (drag = null);
 
     const info = document.getElementById("aimInfo");

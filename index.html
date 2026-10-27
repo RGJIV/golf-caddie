@@ -48,7 +48,7 @@
   </section>
 
   <section class="actions">
-    <button class="primary" id="btnBall">Ball here</button>
+    <button class="primary" id="btnBall">Mark shot</button>
     <button id="btnAim">Aim view</button>
     <button id="btnSet">Settings</button>
   </section>
@@ -58,8 +58,8 @@
 
 <div class="sheet" id="ballSheet" hidden>
   <div class="panel">
-    <h2>Which club from here?</h2>
-    <p class="muted">Saves this spot and club. The next Ball here measures how far it went.</p>
+    <div class="sheetHead"><h2>Which club from here?</h2><button class="x" id="ballX" aria-label="Close">✕</button></div>
+    <p class="muted">Saves this spot and club. The next Mark shot measures how far it went.</p>
     <div class="clubList" id="clubList"></div>
     <button id="ballCancel">Cancel</button>
   </div>
@@ -67,7 +67,7 @@
 
 <div class="sheet" id="settings" hidden>
   <div class="panel">
-    <h2>Settings</h2>
+    <div class="sheetHead"><h2>Settings</h2><button class="x" id="setX" aria-label="Close without saving">✕</button></div>
     <label>Tees <select id="teeSet"></select></label>
     <label class="row"><input type="checkbox" id="comp"> Competition mode (distances only)</label>
     <div class="two">
@@ -77,8 +77,9 @@
     </div>
     <p class="muted">Leave temperature and wind blank to use the latest forecast reading (updated whenever there is signal).</p>
     <h3>Your clubs</h3>
-    <p class="muted">Carry in yards at about 75°F; fairway % for tee clubs. Stored on this phone only.</p>
+    <p class="muted">Carry in yards at about 75°F; fairway % for tee clubs. Change any number, then Save.</p>
     <table class="clubs"><tr><th>Club</th><th>Carry</th><th>Fairway %</th></tr><tbody id="clubRows"></tbody></table>
+    <button id="resetClubs">Put back the original numbers</button>
     <h3>Learned from your shots</h3>
     <div id="learned"></div>
     <div class="actions">
@@ -86,7 +87,10 @@
       <button id="clearShots">Clear logged shots</button>
     </div>
     <textarea id="exportBox" hidden rows="4" aria-label="Round data"></textarea>
-    <button class="primary" id="setClose">Save</button>
+    <div class="actions">
+      <button id="setCancel">Close without saving</button>
+      <button class="primary" id="setClose">Save</button>
+    </div>
   </div>
 </div>
 

@@ -70,6 +70,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   display: flex; flex-direction: column; gap: 12px;
 }
 .panel h2 { margin: 0; font-size: 22px; }
+.sheetHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: sticky; top: -18px; background: var(--bg); padding: 4px 0; z-index: 1; }
+.x { width: 44px; height: 44px; flex: none; border-radius: 22px; border: 2px solid var(--line); background: var(--card); font-size: 20px; line-height: 1; cursor: pointer; }
+#resetClubs { align-self: flex-start; min-height: 40px; padding: 0 14px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); font-size: 15px; }
 .panel h3 { margin: 6px 0 0; font-size: 17px; }
 .panel p { margin: 0; }
 .panel label { display: flex; flex-direction: column; gap: 4px; font-size: 15px; }

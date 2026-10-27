@@ -14,7 +14,12 @@
     get(k, d) { try { const v = localStorage.getItem("gc-" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem("gc-" + k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
   };
+  // Richard's numbers (about 75°F). Built in so the app works on first open; change them in Settings any time.
+  const DEFAULT_CLUBS = [["58 deg", 80], ["54 deg", 100], ["48 deg", 120], ["PW", 140], ["9i", 150], ["8i", 160],
+    ["7i", 170, 0.90], ["6i", 180, 0.88], ["5i", 190, 0.85], ["4i", 200, 0.80], ["5 hybrid", 230, 0.75], ["3 wood", 260, 0.66], ["Driver", 280, 0.25]]
+    .map(([club, carry, fairway]) => ({ club, carry, factor: FACTORS[club], fairway: fairway == null ? null : fairway }));
   let S = store.get("settings", null) || { clubs: [], teeSet: "IV/III", competition: false, temp: null, wind: null };
+  if (!S.clubs || !S.clubs.length) { S.clubs = DEFAULT_CLUBS; store.set("settings", S); }
 
   // setup link: #setup=<base64 json> puts the club numbers on this phone, then leaves the address bar clean
   if (location.hash.startsWith("#setup=")) {
@@ -191,16 +196,23 @@
   // ---- settings ----
   $("btnSet").onclick = () => { fillSettings(); $("settings").hidden = false; };
   $("setClose").onclick = () => { readSettings(); $("settings").hidden = true; render(); };
+  // close without saving: the X and Cancel leave every setting as it was
+  $("setX").onclick = $("setCancel").onclick = () => { $("settings").hidden = true; $("exportBox").hidden = true; };
+  $("ballX").onclick = () => ($("ballSheet").hidden = true);
+  // the boxes change only on screen; nothing is kept until Save
+  $("resetClubs").onclick = () => fillClubRows(DEFAULT_CLUBS);
+  function fillClubRows(clubs) {
+    $("clubRows").innerHTML = ORDER.map((c) => { const k = clubs.find((x) => x.club === c) || {}; return `<tr><td>${c}</td>
+      <td><input inputmode="numeric" data-carry="${c}" value="${k.carry || ""}" aria-label="${c} carry"></td>
+      <td><input inputmode="numeric" data-fw="${c}" value="${k.fairway != null ? r(k.fairway * 100) : ""}" aria-label="${c} fairway percent"></td></tr>`; }).join("");
+  }
   function fillSettings() {
     $("teeSet").innerHTML = C.tee_sets.map((t) => `<option ${t === S.teeSet ? "selected" : ""}>${t}</option>`).join("");
     $("comp").checked = !!S.competition;
     $("tempIn").value = S.temp == null ? "" : S.temp;
     $("windIn").value = S.wind == null ? "" : S.wind.mph;
     $("windDir").value = S.wind == null ? "" : compass(S.wind.fromDeg);
-    const rows = ORDER.map((c) => { const k = S.clubs.find((x) => x.club === c) || {}; return `<tr><td>${c}</td>
-      <td><input inputmode="numeric" data-carry="${c}" value="${k.carry || ""}" aria-label="${c} carry"></td>
-      <td><input inputmode="numeric" data-fw="${c}" value="${k.fairway != null ? r(k.fairway * 100) : ""}" aria-label="${c} fairway percent"></td></tr>`; }).join("");
-    $("clubRows").innerHTML = rows;
+    fillClubRows(S.clubs);
     $("learned").innerHTML = learnedTable();
   }
   function readSettings() {
@@ -229,7 +241,7 @@
   }
   function learnedTable() {
     const L = learned(), ks = ORDER.filter((c) => L[c]);
-    if (!ks.length) return "<p class='muted'>Tap Ball here before each shot. After a few rounds this shows your real distance per club and how often each tee club finds the fairway.</p>";
+    if (!ks.length) return "<p class='muted'>Tap Mark shot before each shot. After a few rounds this shows your real distance per club and how often each tee club finds the fairway.</p>";
     return `<table><tr><th>Club</th><th>Shots</th><th>Median yd</th><th>Fairway off tee</th><th></th></tr>${ks.map((c) => {
       const d = L[c].d.slice().sort((a, b) => a - b), med = r(d[Math.floor(d.length / 2)]);
       return `<tr><td>${c}</td><td>${d.length}</td><td>${med}</td><td>${L[c].tee ? r((100 * L[c].fw) / L[c].tee) + "% of " + L[c].tee : ""}</td>
@@ -252,7 +264,14 @@
 
   function alertBar(msg) { const a = $("toast"); a.textContent = msg; a.hidden = false; clearTimeout(alertBar.t); alertBar.t = setTimeout(() => (a.hidden = true), 4500); }
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator) {
+    // a new version takes over: reload once so the screen shows it (first install has no old version to replace)
+    const hadOld = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadOld && !sessionStorage.getItem("gc-reloaded")) { sessionStorage.setItem("gc-reloaded", "1"); location.reload(); } });
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => {});
+  }
   fetchWeather();
   render();
 })().catch((e) => {
