@@ -74,12 +74,27 @@
   }
   function setHole(n) { holeN = ((n - 1 + 18) % 18) + 1; store.set("hole", holeN); pinSpot = "M"; render(); }
 
+  // the green along your line to it: front edge, center and back edge (from the traced outline; 8 yd either side without one)
+  function greenAxis(h, from) {
+    const g = h.green, d = hyp(from, g) || 1, u = [(g[0] - from[0]) / d, (g[1] - from[1]) / d];
+    const edge = (dir) => {                    // distance from the center to the outline along dir
+      const P = h.greenPoly; if (!P) return 24;
+      let best = Infinity;
+      for (let i = 0; i < P.length; i++) {
+        const a = P[i], b = P[(i + 1) % P.length], ex = b[0] - a[0], ez = b[1] - a[1];
+        const den = dir[0] * ez - dir[1] * ex; if (Math.abs(den) < 1e-9) continue;
+        const t = ((a[0] - g[0]) * ez - (a[1] - g[1]) * ex) / den, s = ((a[0] - g[0]) * dir[1] - (a[1] - g[1]) * dir[0]) / den;
+        if (t > 0 && s >= 0 && s <= 1) best = Math.min(best, t);
+      }
+      return isFinite(best) ? best : 24;
+    };
+    const dF = edge([-u[0], -u[1]]), dB = edge(u);
+    return { g, u, front: [g[0] - u[0] * dF, g[1] - u[1] * dF], back: [g[0] + u[0] * dB, g[1] + u[1] * dB], dF, dB };
+  }
   function pinPoint(h, from) {
-    const g = h.green;
-    if (pinSpot === "M") return g;
-    const ref = h.line.length > 2 ? h.line[h.line.length - 2] : from || teeFor(h).p;
-    const d = hyp(ref, g), u = [(g[0] - ref[0]) / d, (g[1] - ref[1]) / d], k = (pinSpot === "F" ? -8 : 8) * 3;
-    return [g[0] + u[0] * k, g[1] + u[1] * k];
+    if (pinSpot === "M") return h.green;
+    const a = greenAxis(h, from || teeFor(h).p), k = pinSpot === "F" ? -a.dF * 0.55 : a.dB * 0.55;   // front/back pin: halfway to the edge
+    return [a.g[0] + a.u[0] * k, a.g[1] + a.u[1] * k];
   }
 
   // ---- weather: temperature and wind, fetched when there is signal ----
@@ -118,10 +133,8 @@
     document.querySelectorAll("[data-lie]").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.lie === lie)); b.disabled = onTee; });
 
     // front, center, back: straight yards
-    const g = h.green, ref = h.line.length > 2 ? h.line[h.line.length - 2] : p;
-    const d = hyp(ref, g), u = [(g[0] - ref[0]) / d, (g[1] - ref[1]) / d];
-    const yd = (k) => r(hyp(p, [g[0] + u[0] * k * 24, g[1] + u[1] * k * 24]) / 3);
-    $("front").textContent = yd(-1); $("center").textContent = yd(0); $("back").textContent = yd(1);
+    const ax = greenAxis(h, p);
+    $("front").textContent = r(hyp(p, ax.front) / 3); $("center").textContent = r(hyp(p, ax.g) / 3); $("back").textContent = r(hyp(p, ax.back) / 3);
 
     if (S.competition || !S.clubs.length) {
       $("call").hidden = true; $("compNote").hidden = !S.competition; $("setupNote").hidden = !!S.clubs.length || S.competition;
